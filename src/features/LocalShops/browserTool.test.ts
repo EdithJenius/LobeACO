@@ -6,10 +6,11 @@ import { shopBrowserManifest } from './browserTool';
 describe('shop browser manifest', () => {
   it('offers both selected-shop discovery and browser operations as function tools', () => {
     const tools = generateToolsFromManifest(shopBrowserManifest);
-    expect(tools).toHaveLength(3);
+    expect(tools).toHaveLength(4);
     expect(tools.map((tool) => tool.function?.name)).toEqual(
       expect.arrayContaining([
         expect.stringContaining('listShops'),
+        expect.stringContaining('pullCustomerService'),
         expect.stringContaining('listProductLinks'),
         expect.stringContaining('browser'),
       ]),

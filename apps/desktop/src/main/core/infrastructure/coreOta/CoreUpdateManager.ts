@@ -112,6 +112,7 @@ export class CoreUpdateManager {
     );
     this.pointer = emptyPointer(this.shell?.abi ?? '');
     this.baseDisabledReasons = [
+      'lobeaco-independent-distribution',
       !this.shell && 'missing-shell',
       this.shell && !this.shell.manifest && 'missing-core-manifest',
       this.shell && !this.builtinManifest && 'missing-builtin-manifest',

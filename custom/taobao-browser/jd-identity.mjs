@@ -12,9 +12,9 @@ function visibleJdShopName() {
   return names.size === 1 ? [...names][0] : null;
 }
 
-export function verifyJd(manager, account, binding) {
+export function verifyJd(manager, account, binding, checkPrompt) {
   return verifySellerPage(manager, account, binding, {
-    platform: 'jd', name: '京东', entryUrl: 'https://shop.jd.com/',
+    platform: 'jd', name: '京东', entryUrl: 'https://shop.jd.com/', checkPrompt,
     paths: ['/jdm/home'], readName: visibleJdShopName,
     unavailable: '未能读取京麦首页当前店名，请确认账号可以进入京麦工作台后重试',
   });

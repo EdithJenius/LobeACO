@@ -25,7 +25,8 @@ import {readMerchantPage} from './page-read.mjs';
 import {ChatBrowser} from './chat-browser.mjs';
 import {readDouyinProducts} from './douyin-products.mjs';
 
-const loginVerifiers = new Map([['taobao', verifyTaobao], ['tmall', verifyTmall], ['pinduoduo', verifyPinduoduo], ['jd', verifyJd], ['douyin', verifyDouyin]]);
+const loginVerifiers = new Map([['taobao', (manager,account,binding,inspect)=>verifyTaobao(manager,account,binding,'taobao',inspect)],
+  ['tmall', verifyTmall], ['pinduoduo', verifyPinduoduo], ['jd', verifyJd], ['douyin', verifyDouyin]]);
 loginVerifiers.set('wechat-shop',verifyWechatShop);
 for (const p of buyerPlatforms) loginVerifiers.set(p.id,verifyBuyer);
 export const canCheckLogin = platform => loginVerifiers.has(platform);
@@ -49,6 +50,7 @@ export function validateScheduleCapacity(schedule,count) {
 }
 
 export class CollectionStore {
+  checkResponses=new Map();
   constructor(runtime, manager, profiles) {
     this.file=path.join(runtime,'shop-collections.json');
     this.manager=manager; this.profiles=profiles; this.checks=new Map(); this.running=new Map(); this.queue=Promise.resolve();
@@ -163,7 +165,7 @@ export class CollectionStore {
   resumeLoginChecks() {
     for (const [account,shop] of Object.entries(this.state.shops)) {
       if(shop.pendingCheck && !shop.unbound && !this.manager.manual.has(account) &&
-        !this.manager.hasOpenWorkbench?.(account) && !this.running.has(account)) {
+        !this.manager.hasOpenWorkbench?.(account) && !this.manager.hasBackgroundSession?.(account) && !this.running.has(account)) {
         void this.checkLogin(account).catch(error=>console.error('Login verification:',error.message));
       }
     }
@@ -171,7 +173,11 @@ export class CollectionStore {
   async checkLogin(account) {
     const verify=loginVerifiers.get(this.profiles.items.find(p=>p.id===account)?.platform);
     if(!verify)throw Error('该平台尚未接入登录核验');
-    if(this.checks.has(account)) return this.checks.get(account);
+    const active=this.checkResponses.get(account);
+    if(active){
+      if(active.page && !active.page.isClosed())await active.page.bringToFront().catch(()=>{});
+      return active.result;
+    }
     const binding=this.state.shops[account] ??= {};
     if(this.manager.manual.has(account)){
       this.waitForLogin(account);await this.save();
@@ -179,26 +185,46 @@ export class CollectionStore {
     }
     if(this.running.has(account))throw Error('该店铺正在采集，结束后可检查登录');
     Object.assign(binding,{authStatus:'checking',pendingCheck:true,checkError:null});
+    const presented=Promise.withResolvers();
+    const request={page:null};
+    const notify=async page=>{
+      request.page=page;
+      Object.assign(binding,{authStatus:'security_verification',checkError:'请在已打开的商家页面完成安全验证'});
+      await this.save();
+      presented.resolve({account,status:'security_verification',message:binding.checkError});
+    };
     const task=this.manager.run(account,async()=>{
       const verifyAgainOnClose=Boolean(this.manager.hasOpenWorkbench?.(account));
+      let checkOnClose=verifyAgainOnClose;
       try {
         await this.save();
-        const identity=await verify(this.manager,account,binding);
-        Object.assign(binding,identity,{authStatus:'authenticated'});
+        const identity=this.manager.verifyLogin
+          ? await this.manager.verifyLogin(account,binding,verify,notify)
+          : await verify(this.manager,account,binding);
+        Object.assign(binding,identity,{authStatus:'authenticated',checkError:null});
         return {account,status:'completed',...identity};
       } catch(error) {
+        if(error.deferUntilBrowserClose){
+          checkOnClose=true;
+          binding.checkError=error.message;
+          return {account,status:'waiting_for_browser',message:error.message};
+        }
+        if(request.page?.isClosed())checkOnClose=false;
         Object.assign(binding,{authStatus:error.authStatus || (error.expired?'expired':'check_failed'),checkError:error.message});
         return {account,status:'failed',error:error.message};
       } finally {
-        Object.assign(binding,{pendingCheck:verifyAgainOnClose,checkedAt:new Date().toISOString()});
+        binding.pendingCheck=checkOnClose;
+        if(binding.authStatus!=='checking')binding.checkedAt=new Date().toISOString();
         await this.save();
       }
-    }).finally(()=>{this.checks.delete(account);this.running.delete(account);});
+    }).finally(()=>{this.checkResponses.delete(account);this.checks.delete(account);this.running.delete(account);});
+    request.result=Promise.race([task,presented.promise]);
+    this.checkResponses.set(account,request);
     this.checks.set(account,task);this.running.set(account,task);
-    return task;
+    return request.result;
   }
   async command(input) {
-    if (['access','setAccess','live','snapshot','pageRead','browser','productList'].includes(input.action)) return chatShops(this,input);
+    if (['access','setAccess','live','snapshot','pageRead','browser','productList','customerService'].includes(input.action)) return chatShops(this,input);
     if(input.action==='list'||input.action==='pair')return this.list();
     if(input.action==='create') {
       const platform=getPlatform(input.platform ?? 'taobao');
@@ -258,7 +284,11 @@ export class CollectionStore {
       return result;
     }
     if(input.action==='openWorkbench')return this.manager.execute({account:p.id,action:'openWorkbench'});
-    if(input.action==='close')return this.manager.execute({account:p.id,action:'close'});
+    if(input.action==='close'){
+      const prompt=this.checkResponses.get(p.id)?.page;
+      if(prompt && !prompt.isClosed())await prompt.close().catch(()=>{});
+      return this.manager.execute({account:p.id,action:'close'});
+    }
     if(canCheckLogin(p.platform) && input.action==='finishLogin'){
       this.waitForLogin(p.id);await this.save();
       if(this.manager.manual.has(p.id)){await finishLoginWindow(this.manager,p.id);return {account:p.id,status:'awaiting_close'};}

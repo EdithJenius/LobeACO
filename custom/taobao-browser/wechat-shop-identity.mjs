@@ -26,10 +26,10 @@ export function readWechatShopName() {
   return names.size === 1 ? [...names][0] : null;
 }
 
-export function verifyWechatShop(manager, account, binding) {
+export function verifyWechatShop(manager, account, binding, checkPrompt) {
   return verifySellerPage(manager, account, binding, {
     platform:'wechat-shop', name:'微信小店', entryUrl:new URL('/shop/setting/profile',manager.platform(account).homeUrl).href,
-    paths:['/shop/setting/profile','/shop/home'], readName:readWechatShopName,
+    paths:['/shop/setting/profile','/shop/home'], readName:readWechatShopName, checkPrompt,
     signedOut:/^\s*(扫码进入我的小店|登录超时，请重新\s*登录)\s*$/,
     unavailable:'未能确认微信小店的店铺名称，请确认扫码后已进入所选店铺的商家后台',
   });

@@ -177,7 +177,7 @@ export class App {
     this.permissionGuide = new PermissionGuide(this);
 
     this.coreUpdateManager = new CoreUpdateManager(this);
-    this.coreUpdateManager.initialize();
+    // LobeACO uses a separate distribution and must not apply upstream core updates.
     app.on('web-contents-created', (_event, webContents) => {
       webContents.on('render-process-gone', () => {
         this.coreUpdateManager.handleRendererCrash();

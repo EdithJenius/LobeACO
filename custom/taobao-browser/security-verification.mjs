@@ -1,4 +1,4 @@
-import {finishVerification,needsLogin,officialTaskPage,presentVerification,taskWindow} from './task-window.mjs';
+import {finishVerification,needsLogin,officialTaskPage,presentVerification,setTaskWindowState,taskWindow} from './task-window.mjs';
 
 export function securityVerification(message = '商家后台要求完成安全验证') {
   return Object.assign(new Error(message), {authStatus:'security_verification'});
@@ -34,7 +34,7 @@ export async function checkSecurityPrompt(page,assertAccess=()=>{}) {
       if(login && !challenge && task.platform==='taobao')throw Object.assign(Error('千牛要求重新登录，请从店铺管理打开该店的手动登录窗口'),{expired:true});
       if(!login&&!challenge)return shown;
       if(Date.now()>=deadline)throw challenge??Object.assign(Error('等待商家完成登录超时'),{expired:true});
-      if(!shown){shown=true;await presentVerification(page,task);}
+      if(!shown){shown=true;console.info('店铺任务等待人工处理',task.platform,login?'登录':'安全验证');await presentVerification(page,task);}
       await page.waitForTimeout(500).catch(error=>{
         if(page.isClosed())throw securityVerification('验证窗口已关闭，尚未确认验证完成');
         throw error;
@@ -43,6 +43,35 @@ export async function checkSecurityPrompt(page,assertAccess=()=>{}) {
   }finally{
     if(shown)await finishVerification(page,task);
   }
+}
+
+// Interactive identity checks keep the original merchant page alive while the user verifies.
+export function loginPromptHandler(platform,notify) {
+  return async function inspect(page,{confirm=false}={}) {
+    if(!officialTaskPage(page,{platform}))return false;
+    if(confirm)await page.waitForTimeout(500);
+    let shown=false;
+    const task=taskWindow(page), deadline=Date.now()+300000;
+    try {
+      for(;;){
+        if(page.isClosed())throw securityVerification('验证页面已关闭，请重新检查登录');
+        try{await detectSecurityPrompt(page);return shown;}
+        catch(error){
+          if(error.authStatus!=='security_verification'||error.accessRestricted)throw error;
+        }
+        if(Date.now()>=deadline)throw securityVerification('等待手动验证超时，请重新检查登录');
+        if(!shown){
+          if(task)await presentVerification(page,task);
+          else await setTaskWindowState(page,'normal');
+          shown=true;
+          await notify(page);
+        }
+        await page.waitForTimeout(350).catch(()=>{throw securityVerification('验证页面已关闭，请重新检查登录');});
+      }
+    } finally {
+      if(shown&&task)await finishVerification(page,task).catch(()=>{});
+    }
+  };
 }
 
 // Give the merchant time to complete the platform's prompt in the current visible window.

@@ -1,3 +1,7 @@
+import { isDesktop } from '@lobechat/const';
+
+import { ensureElectronIpc } from '@/utils/electron/ipc';
+
 export interface ShopRun {
   account: string;
   error?: string;
@@ -37,6 +41,7 @@ export interface LocalShopData {
 }
 class LocalShopsService {
   async command<T = LocalShopData>(input: Record<string, unknown>): Promise<T> {
+    if (isDesktop) return ensureElectronIpc().localShop.command(input) as Promise<T>;
     const response = await fetch('/api/local-shops', {
       body: JSON.stringify(input),
       headers: { 'Content-Type': 'application/json' },

@@ -82,7 +82,7 @@ export default function ExpertTeams({
           ]
             .filter(Boolean)
             .join('\n'),
-          content: t('teams.assignment', { id: lead, name: agentDisplayName(leader) }),
+          content: t('teams.assignment', { id: lead, name: agentDisplayName(leader) ?? lead }),
           title: name.trim(),
           visibility: 'private',
         });

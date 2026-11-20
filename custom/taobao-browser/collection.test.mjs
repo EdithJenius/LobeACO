@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {CollectionStore,parseDashboard,validateScheduleCapacity} from './collection.mjs';
 import {chromium} from 'playwright';
+import {BrowserManager} from './core.mjs';
 import {visibleReport,shopReports} from './shop-report.mjs';
 import {searchTaobaoSources} from './source-catalog.mjs';
 import {hasSellerDashboard,parseSellerDashboard} from './seller-dashboard.mjs';
@@ -12,6 +13,48 @@ import {recordRun,receipts,pddHomeId} from './source-ledger.mjs';
 import {archiveCompass,inspectWorkbook,officialSingleDay} from './compass-workbook.mjs';
 import {createHash} from 'node:crypto';
 import * as XLSX from 'xlsx';
+
+test('check login presents the original verification page, deduplicates clicks and verifies the shop after handoff',async()=>{
+  const root=await fs.mkdtemp(path.join(os.tmpdir(),'shop-check-prompt-'));
+  const browser=await chromium.launch(), ctx=await browser.newContext();
+  const manager=new BrowserManager(root), account='taobao-a';
+  manager.registerProfile({id:account,platform:'pinduoduo'});
+  manager.sessions.set(account,ctx);
+  const store=new CollectionStore(root,manager,{items:[{id:account,platform:'pinduoduo'}]});
+  const entry='https://mms.pinduoduo.com/mallcenter/mallinfo';
+  let challenge=true;
+  const identity='<label>店铺名称</label><div>测试商家</div>';
+  await ctx.route('**/*',r=>r.fulfill({contentType:'text/html; charset=utf-8',body:identity+(challenge?'<aside>请向右滑块完成拼图</aside>':'')}));
+  const original=await ctx.newPage();
+  try{
+    await store.init();
+    store.state.shops[account]={storeName:'测试商家'};
+    await original.goto(entry);
+    const check=()=>store.command({action:'check',account});
+    manager.backgroundContexts.add(ctx);
+    assert.equal((await check()).status,'waiting_for_browser');
+    store.resumeLoginChecks();assert.equal(store.checks.size,0);
+    manager.backgroundContexts.delete(ctx);store.resumeLoginChecks();
+    assert.equal((await check()).status,'security_verification');
+    assert.equal((await check()).status,'security_verification');
+    assert.deepEqual(ctx.pages(),[original]);
+    assert.equal(store.list().shops[0].authStatus,'security_verification');
+    const finished=store.checks.get(account);
+    challenge=false;await original.setContent(identity);
+    assert.equal((await finished).status,'completed');
+    assert.deepEqual(ctx.pages(),[original]);
+    assert.equal(store.list().shops[0].authStatus,'authenticated');
+    // This time the prompt occurs on the new identity page rather than in the workbench.
+    challenge=true;
+    assert.equal((await check()).status,'security_verification');
+    const canceled=store.checks.get(account), prompt=ctx.pages().find(p=>p!==original);
+    assert.equal(prompt.url(),entry);await prompt.close();
+    assert.equal((await canceled).status,'failed');
+    assert.equal(store.list().shops[0].authStatus,'security_verification');
+    assert.equal(store.list().shops[0].pendingCheck,false);
+    assert.deepEqual(ctx.pages(),[original]);
+  }finally{await browser.close();await fs.rm(root,{recursive:true,force:true});}
+});
 
 test('Compass export dates distinguish a single merchant day from date ranges',()=>{
   const date='2026-11-17';

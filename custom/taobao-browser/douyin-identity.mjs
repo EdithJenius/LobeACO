@@ -15,10 +15,10 @@ export function visibleDouyinShopName() {
   return names.size === 1 ? [...names][0] : null;
 }
 
-export function verifyDouyin(manager, account, binding) {
+export function verifyDouyin(manager, account, binding, checkPrompt) {
   const entryUrl = getPlatform('douyin').homeUrl;
   return verifySellerPage(manager, account, binding, {
-    platform: 'douyin', name: '抖店', entryUrl,
+    platform: 'douyin', name: '抖店', entryUrl, checkPrompt,
     identityTimeout:35000,
     paths: [new URL(entryUrl).pathname], readName: visibleDouyinShopName,
     unavailable: '未能确认抖店商家首页的当前店名，请在专属窗口完成登录并选择店铺后重试',

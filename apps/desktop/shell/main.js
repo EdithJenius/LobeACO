@@ -1,6 +1,10 @@
 const path = require('node:path');
 const { app } = require('electron');
 
+// A downstream app must not share data or the single-instance lock with LobeHub.
+app.setName('LobeACO');
+app.setPath('userData', path.join(app.getPath('appData'), 'LobeACO'));
+
 const DOWNLOAD_URL = 'https://lobehub.com/downloads';
 
 // resolveCore counts every launch as a boot attempt; a secondary instance exits without ever
@@ -61,18 +65,13 @@ try {
   };
 
   const abi = loadAbi();
-  const startupUpdate = app.isPackaged
-    ? require('./update').createStartupUpdate({
-        channel: require(path.join(builtinDir, 'manifest.json')).channel,
-        userData: app.getPath('userData'),
-      })
-    : undefined;
+  const startupUpdate = undefined;
 
   core = app.isPackaged
     ? resolveCore({
         abi: abi.shellAbi,
         builtinDir,
-        deferBoot: startupUpdate.pending,
+        deferBoot: startupUpdate?.pending ?? false,
         publicKey: abi.publicKey,
         userData: app.getPath('userData'),
       })

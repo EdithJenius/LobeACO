@@ -19,6 +19,25 @@ describe('local shop browser executor', () => {
         : { page: 'ok' },
     );
   });
+  it('runs reports in selection order and stops on the first unresolved shop', async () => {
+    const visited: string[] = [];
+    let active = false;
+    command.mockImplementation(async (input) => {
+      if (input.action === 'access') return { accounts: ['b', 'a', 'c'], revision: 'r', shops: [] };
+      expect(active).toBe(false);
+      expect(input).toMatchObject({ action: 'customerService', revision: 'r', startDate: '2026-01-10' });
+      active = true;
+      await Promise.resolve();
+      visited.push(input.account);
+      active = false;
+      return { account: input.account, status: input.account === 'a' ? 'blocked' : 'differences' };
+    });
+    const result = await localShopBrowserExecutor.invoke(
+      'pullCustomerService', { startDate: '2026-01-10' }, { agentId: 'agent', topicId: 'topic', messageId: 'm' },
+    );
+    expect(result.success).toBe(true);
+    expect(visited).toEqual(['b', 'a']);
+  });
   it('derives scope and revision from the conversation, not model arguments', async () => {
     const out = await localShopBrowserExecutor.invoke(
       'browser',

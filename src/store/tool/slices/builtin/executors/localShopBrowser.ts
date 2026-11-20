@@ -4,6 +4,7 @@ import { shopBrowserIdentifier } from '@/features/LocalShops/browserTool';
 import { getCacheScope } from '@/libs/swr/useCacheScope';
 import { localShopsService } from '@/services/localShops';
 
+const apiNames = ['listShops', 'listProductLinks', 'browser', 'pullCustomerService'];
 const operations = new Set([
   'open',
   'inspect',
@@ -19,8 +20,8 @@ const cleanupRegistered = new Set<string>();
 
 export const localShopBrowserExecutor: IBuiltinToolExecutor = {
   identifier: shopBrowserIdentifier,
-  getApiNames: () => ['listShops', 'listProductLinks', 'browser'],
-  hasApi: (name) => name === 'listShops' || name === 'listProductLinks' || name === 'browser',
+  getApiNames: () => apiNames,
+  hasApi: (name) => apiNames.includes(name),
   invoke: async (
     name,
     params: Record<string, unknown>,
@@ -34,6 +35,24 @@ export const localShopBrowserExecutor: IBuiltinToolExecutor = {
         revision: string;
         shops: { id: string }[];
       }>({ ...key, action: 'access' });
+      if (name === 'pullCustomerService') {
+        if (!access.accounts?.length) throw new Error('请先在会话中选择店铺');
+        const results = [];
+        for (const account of access.accounts) {
+          try {
+            const result = await localShopsService.command<{ status: string }>({
+              ...key, account, action: 'customerService', revision: access.revision,
+              startDate: params?.startDate, endDate: params?.endDate,
+            });
+            results.push(result);
+            if (!['matched', 'differences'].includes(result.status)) break;
+          } catch (error) {
+            results.push({ account, status: 'blocked', reason: error instanceof Error ? error.message : String(error) });
+            break;
+          }
+        }
+        return { success: true, content: JSON.stringify({ selected: access.accounts, results }) };
+      }
       if (name === 'listShops')
         return {
           success: true,

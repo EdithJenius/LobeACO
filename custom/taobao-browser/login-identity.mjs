@@ -61,7 +61,7 @@ export function extractTmallIdentity() {
   return {storeId,storeName};
 }
 
-export async function readIdentityField(page,kind,platform='taobao') {
+export async function readIdentityField(page,kind,platform='taobao',inspect=checkSecurityPrompt) {
   const tmallIdentity=kind==='identity' && platform==='tmall';
   const url=kind==='remark'?subUrl:tmallIdentity?tmallCenterUrl:centerUrl;
   const duration=kind==='remark'?7500:14000;
@@ -69,7 +69,7 @@ export async function readIdentityField(page,kind,platform='taobao') {
   await page.goto(url,{waitUntil:'commit',timeout:deadline-Date.now()});
   do {
     if(page.isClosed?.())throw Error('核验页面已关闭');
-    if(await checkSecurityPrompt(page)){
+    if(await inspect(page)){
       deadline=Date.now()+duration;
       if(new URL(page.url()).pathname!==new URL(url).pathname)await page.goto(url,{waitUntil:'commit',timeout:duration});
     }
@@ -85,7 +85,10 @@ export async function readIdentityField(page,kind,platform='taobao') {
         if(!match || !(/^(?:[a-z0-9-]+\.)*taobao\.com$/i.test(match[1]) ||
           (platform==='tmall' && /^(?:[a-z0-9-]+\.)*tmall\.com$/i.test(match[1])))) continue;
         const value=await frame.evaluate(tmallIdentity?extractTmallIdentity:extractAccountField,kind).catch(()=>null);
-        if(value)return value;
+        if(value){
+          if(inspect!==checkSecurityPrompt && await inspect(page,{confirm:true})){deadline=Date.now()+duration;break;}
+          return value;
+        }
       }
     }
     await new Promise(resolve=>setTimeout(resolve,180));
@@ -95,11 +98,11 @@ export async function readIdentityField(page,kind,platform='taobao') {
   throw Error('未能在千牛「店铺信息」读取唯一店铺 ID 和店名，请检查该账号的店铺信息权限后重试');
 }
 
-export function verifyTmall(manager,account,binding) {
-  return verifyTaobao(manager,account,binding,'tmall');
+export function verifyTmall(manager,account,binding,inspect) {
+  return verifyTaobao(manager,account,binding,'tmall',inspect);
 }
 
-export async function verifyTaobao(manager,account,binding,platform='taobao') {
+export async function verifyTaobao(manager,account,binding,platform='taobao',inspect) {
   const owned=!manager.sessions?.has(account);
   const context=await manager.context(account,{background:true});
   const pages=[];
@@ -108,10 +111,13 @@ export async function verifyTaobao(manager,account,binding,platform='taobao') {
     pages.push(shopPage);
     const notePage=trackTaskPage(await context.newPage());
     pages.push(notePage);
-    const identity=await readIdentityField(shopPage,'identity',platform);
+    const identity=await readIdentityField(shopPage,'identity',platform,inspect);
     if(binding.storeId && identity.storeId!==binding.storeId)throw Error('此登录环境的店铺ID已改变，请新建店铺环境进行绑定');
     if(!binding.storeId && binding.storeName && identity.storeName!==binding.storeName)throw Error('此登录环境的店铺名称与原绑定不一致');
-    const accountName=await readIdentityField(notePage,'remark',platform).catch(()=>null);
+    const accountName=await readIdentityField(notePage,'remark',platform,inspect).catch(error=>{
+      if(error.authStatus || error.expired)throw error;
+      return null;
+    });
     return {...identity,accountName};
   } finally {
     if(owned && manager.sessions?.get(account)===context) await closeShopContext(context);

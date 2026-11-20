@@ -1,6 +1,6 @@
 {
-  "name": "lobehub-desktop-dev",
-  "version": "0.0.0",
+  "name": "lobeaco-desktop",
+  "version": "0.1.0",
   "private": true,
   "description": "LobeHub Desktop Application",
   "homepage": "https://lobehub.com",
@@ -140,5 +140,6 @@
   },
   "optionalDependencies": {
     "node-mac-permissions": "^2.5.0"
-  }
+  },
+  "productName": "LobeACO"
 }

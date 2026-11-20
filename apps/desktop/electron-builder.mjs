@@ -52,9 +52,9 @@ const hasAppleCertificate = Boolean(process.env.CSC_LINK);
  * DESKTOP_PRODUCT_NAME; `brandName` here is the channel-less form for
  * user-facing strings.
  */
-const appId = process.env.DESKTOP_APP_ID || 'com.lobehub.lobehub-desktop';
-const brandName = process.env.DESKTOP_PRODUCT_NAME || 'LobeHub';
-const executableName = process.env.DESKTOP_EXECUTABLE_NAME || 'LobeHub';
+const appId = process.env.DESKTOP_APP_ID || 'com.lobeaco.desktop';
+const brandName = process.env.DESKTOP_PRODUCT_NAME || 'LobeACO';
+const executableName = process.env.DESKTOP_EXECUTABLE_NAME || 'LobeACO';
 // Communication notifications need the restricted
 // `com.apple.developer.usernotifications.communication` entitlement, and
 // macOS refuses to launch an app carrying it without a provisioning profile
@@ -166,7 +166,7 @@ const getProtocolScheme = () => {
   }
   if (isCanary) return 'lobehub-canary';
   if (isNightly) return 'lobehub-nightly';
-  return 'lobehub';
+  return 'lobeaco';
 };
 
 const protocolScheme = getProtocolScheme();
@@ -327,6 +327,7 @@ const config = {
     }
   },
   appId,
+  productName: 'LobeACO',
   appImage: {
     artifactName: '${productName}-${version}.${ext}',
   },
@@ -445,7 +446,7 @@ const config = {
       { arch: [arch === 'arm64' ? 'arm64' : 'x64'], target: 'zip' },
     ],
   },
-  npmRebuild: true,
+  npmRebuild: false,
   nsis: {
     allowToChangeInstallationDirectory: true,
     artifactName: '${productName}-${version}-setup.${ext}',
@@ -483,6 +484,18 @@ const config = {
       }
     : {}),
   extraResources: [
+    {
+      from: path.resolve(__dirname, '../../custom/taobao-browser'),
+      to: 'lobeaco-shop',
+      filter: ['**/*', '!runtime{,/**}', '!node_modules{,/**}', '!*.log'],
+    },
+    {
+      from: path.resolve(__dirname, '../../custom/taobao-browser/node_modules'),
+      to: 'lobeaco-shop/node_modules',
+      filter: ['**/*'],
+    },
+    { from: path.join(__dirname, 'desktop-browsers'), to: 'lobeaco-browsers' },
+    { from: path.resolve(__dirname, '../../custom/analysis'), to: 'analysis' },
     { from: 'resources/bin', to: 'bin' },
     { from: 'core.asar', to: 'core.asar' },
     { from: 'core.asar.unpacked', to: 'core.asar.unpacked' },

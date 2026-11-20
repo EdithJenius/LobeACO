@@ -1,3 +1,4 @@
+import {customerServiceReport} from './customer-service-report.mjs';
 import {randomUUID} from 'node:crypto';
 
 export async function chatShops(store, input) {
@@ -24,13 +25,20 @@ export async function chatShops(store, input) {
     links[key]={accounts:[...input.accounts],revision:randomUUID()}; await store.save();
     await store.chatBrowser?.closeConversation(scope,agent,topic,access.revision);
   }
-  if(input.action==='live' || input.action==='snapshot' || input.action==='pageRead' || input.action==='browser' || input.action==='productList') {
+  if(input.action==='customerService' || input.action==='live' || input.action==='snapshot' || input.action==='pageRead' || input.action==='browser' || input.action==='productList') {
     const assertAccess=()=>{
       if(input.revision!==links[key]?.revision || !links[key].accounts.includes(input.account) ||
           !available().some(p=>p.id===input.account)) throw Error('店铺关联已变更，请重新读取');
     };
     assertAccess();
     try {
+      if(input.action==='customerService'){
+        const job=(store.customerServiceQueue??Promise.resolve()).then(()=>{
+          assertAccess();return customerServiceReport(store,input.account,input,assertAccess);
+        });
+        store.customerServiceQueue=job.catch(()=>{});
+        const result=await job;assertAccess();return result;
+      }
       if(input.action==='productList') {
         const value=await store.readProducts(input.account,input,assertAccess);
         assertAccess();return value;

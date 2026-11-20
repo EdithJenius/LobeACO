@@ -27,6 +27,10 @@ export async function verifySellerPage(manager, account, binding, source) {
         const raw = await page.evaluate(source.readName).catch(() => null);
         const name = typeof raw === 'string' ? raw.replace(/^[\s\u200b]+|[\s\u200b]+$/gu, '') : '';
         if (name) {
+          if(source.checkPrompt && await source.checkPrompt(page,{confirm:true})){
+            deadline=Date.now()+identityTimeout;
+            continue;
+          }
           if (binding.storeName?.trim() && binding.storeName.trim() !== name)
             throw Error('当前'+source.name+'店名与已绑定店铺不一致，请核对登录账号');
           return {storeName:name};

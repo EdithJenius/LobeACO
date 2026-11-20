@@ -2,6 +2,7 @@ export function businessAgent(agent: { metadata?: unknown; title?: string | null
   const meta = agent?.metadata as { expertPackage?: { id?: string } } | undefined;
   return (
     meta?.expertPackage?.id === '1688-seller-assistant' ||
+    meta?.expertPackage?.id === 'shop-operations-assistant' ||
     agent?.title === '生意助手' ||
     agent?.title === '1688生意助手'
   );

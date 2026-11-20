@@ -21,7 +21,7 @@ export class ProfileStore{
    this.items = JSON.parse(await fs.readFile(path.join(this.root, 'profiles.json'), 'utf8'));
   } catch (error) {
    if (error.code !== 'ENOENT') throw error;
-   this.items = ['taobao-a','taobao-b'].map((id, index) => ({id, name:`淘宝账号 ${index ? 'B' : 'A'}`, platform:'taobao', createdAt:new Date().toISOString()}));
+   this.items = process.env.TAOBAO_EMPTY_PROFILES === '1' ? [] : ['taobao-a','taobao-b'].map((id, index) => ({id, name:`淘宝账号 ${index ? 'B' : 'A'}`, platform:'taobao', createdAt:new Date().toISOString()}));
   }
   if (!Array.isArray(this.items)) throw Error('Invalid profile registry');
   const ids = new Set();

@@ -24,7 +24,7 @@ export const updaterConfig = {
     autoDownloadUpdate: true,
     checkUpdateInterval: 60 * 60 * 1000, // 1 hour
   },
-  enableAppUpdate: !isDev,
+  enableAppUpdate: false,
 };
 
 export const getSparkleFeedUrl = (baseUrl: string, channel: UpdateChannel) =>

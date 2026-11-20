@@ -6,6 +6,7 @@ import {spawn} from 'node:child_process';
 import {recoverBlankLogin, showLoginWindow} from './foreground-window.mjs';
 import {getPlatform, isPlatformLogin, validatePlatformUrl} from './platforms.mjs';
 import {registerTaskWindow,releaseTaskWindow,setTaskWindowState,taskWindow} from './task-window.mjs';
+import {loginPromptHandler} from './security-verification.mjs';
 export const accounts = ['taobao-a', 'taobao-b'];
 export function validateAccount(id) { if (!accounts.includes(id)) throw Error('Unknown account'); return id; }
 export async function prepareProfile(root){
@@ -75,6 +76,22 @@ export class BrowserManager {
   }
   hasOpenWorkbench(account) {
     return this.workbenchPages.has(this.sessions.get(account));
+  }
+  hasBackgroundSession(account) {
+    return this.backgroundContexts.has(this.sessions.get(account));
+  }
+  async verifyLogin(account,binding,verify,notify) {
+    const existing=this.sessions.get(account);
+    if(this.hasBackgroundSession(account))throw Object.assign(Error('后台会话结束后将自动核验账号'),{deferUntilBrowserClose:true});
+    const context=existing || await this.context(account,{automatic:true});
+    const inspect=loginPromptHandler(this.platform(account).id,notify);
+    try{
+      // A visible workbench can already be showing the exact challenge the merchant needs.
+      if(existing)for(const page of context.pages())if(!page.isClosed())await inspect(page);
+      return await verify(this,account,binding,inspect);
+    }finally{
+      if(!existing && this.sessions.get(account)===context)await closeShopContext(context);
+    }
   }
   async openWorkbench(account) {
     const platform=this.platform(account);

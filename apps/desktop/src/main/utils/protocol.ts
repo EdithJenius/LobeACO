@@ -12,7 +12,7 @@ export type AppChannel = 'stable' | 'beta' | 'nightly';
  * rejects non-lowercase values (electron-builder.mjs); this keeps the runtime
  * consistent even if one slips through.
  */
-const getSchemeOverride = () => getDesktopEnv().DESKTOP_PROTOCOL_SCHEME?.toLowerCase();
+const getSchemeOverride = () => getDesktopEnv().DESKTOP_PROTOCOL_SCHEME?.toLowerCase() || 'lobeaco';
 
 export const getProtocolScheme = (): string => {
   // A distribution owns its scheme outright. The heuristics below only know

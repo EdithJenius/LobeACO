@@ -17,11 +17,11 @@ if (electronIs.dev()) {
   // enough: Electron's single-instance lock is keyed by the userData dir, so
   // distinct dirs let multiple dev instances run concurrently. Override with an
   // absolute path via LOBE_DESKTOP_USER_DATA_DIR for multi-instance testing.
-  app.setName('lobehub-desktop-dev');
+  app.setName('lobeaco-desktop-dev');
   const userDataOverride = process.env.LOBE_DESKTOP_USER_DATA_DIR;
   app.setPath(
     'userData',
-    userDataOverride || path.join(app.getPath('appData'), 'lobehub-desktop-dev'),
+    userDataOverride || path.join(app.getPath('appData'), 'lobeaco-desktop-dev'),
   );
   // A launcher-managed instance with a test-account profile (`scripts/devInstance.mts`,
   // `mockKeychain`) encrypts tokens and cookies with Chromium's fixed mock key
