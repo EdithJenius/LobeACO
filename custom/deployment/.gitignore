@@ -1,0 +1,4 @@
+.env
+searxng-settings.yml
+test-account.json
+*.log

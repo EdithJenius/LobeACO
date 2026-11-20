@@ -1,0 +1,23 @@
+services:
+  lobe:
+    ports: !override
+      - 127.0.0.1:3212:3210
+  checkout-spa:
+    image: lobehub/lobehub:2.3.3
+    entrypoint: ["/bin/node", "/checkout-spa.cjs"]
+    environment:
+      LOBE_LOCAL_BACKEND_HOST: lobe
+      LOBE_LOCAL_BACKEND_PORT: "3210"
+      LOBE_LOCAL_DESKTOP_BUILD: /spa-desktop
+      LOBE_LOCAL_MOBILE_BUILD: /spa-mobile
+      LOBE_LOCAL_WEB_HOST: 0.0.0.0
+    ports:
+      - 127.0.0.1:3210:3210
+    volumes:
+      - ./checkout-spa.cjs:/checkout-spa.cjs:ro
+      - ./shop-bridge.cjs:/shop-bridge.cjs:ro
+      - "../taobao-browser/runtime/bridge:/shop-runtime:ro"
+      - ../../dist/desktop:/spa-desktop:ro
+      - ../../dist/mobile:/spa-mobile:ro
+    read_only: true
+    restart: unless-stopped
